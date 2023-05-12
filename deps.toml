@@ -1,0 +1,12 @@
+depsversion = "0.0.0"
+
+name = "piot/time-tick-c"
+version = "0.0.0"
+
+[[dependencies]]
+name = "piot/monotonic-time-c"
+version = "*"
+
+[[dependencies]]
+name = "piot/clog"
+version = "*"
