@@ -24,14 +24,16 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
     int delta = now - self->tickedUpToMonotonic;
 
     int iterationCount = delta / self->targetDeltaTimeMs;
-    if (iterationCount > 30) {
-        // CLOG_C_NOTICE(&self->log, "time is so much in the future, that we can not keep up");
+    if (iterationCount > 15) {
+        CLOG_C_NOTICE(&self->log,
+                      "time is so much in the future, that we can not keep up, giving up on a lot of ticks");
         self->tickedUpToMonotonic = now;
         iterationCount = 1;
     }
 
-    if (iterationCount > 2) {
+    if (iterationCount > 4) {
         CLOG_C_NOTICE(&self->log, "should be updated more frequently, needs to do %d updates", iterationCount)
+        iterationCount = 4;
     }
 
     if (iterationCount == 0) {
@@ -45,13 +47,9 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
         return 0;
     }
 
-    if (iterationCount > 4) {
-        iterationCount = 4;
-    }
 
-    int result = 0;
     for (int i = 0; i < iterationCount; i++) {
-        result = self->timeTickFn(self->ptr);
+        int result = self->timeTickFn(self->ptr);
         if (result < 0) {
             return result;
         }
