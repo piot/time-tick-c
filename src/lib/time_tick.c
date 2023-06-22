@@ -37,7 +37,7 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
     }
 
     if (iterationCount == 0) {
-        if ((self->targetDeltaTimeMs - delta) > (int) ((float) self->targetDeltaTimeMs * 0.8f)) {
+        if ((int)(self->targetDeltaTimeMs - delta) > (int) ((float) self->targetDeltaTimeMs * 0.8f)) {
             iterationCount = 1;
         } else {
             return 0;
