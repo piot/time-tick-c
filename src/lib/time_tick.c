@@ -17,45 +17,40 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
 {
     if (self->targetDeltaTimeMs == 0U) {
         self->tickedUpToMonotonic = now;
+    }
 
+    size_t iterationCount = 1;
+
+    const size_t maximumAheadTimeFactorUntilSkipping = 3;
+    if (self->tickedUpToMonotonic >
+        now + (MonotonicTimeMs) (self->targetDeltaTimeMs * maximumAheadTimeFactorUntilSkipping)) {
+        // We have ticked too much into the future. We need to skip this update
+        CLOG_C_NOTICE(&self->log, "timeTickUpdate() has been called too frequently, skipping a tick this update", iterationCount)
         return 0;
     }
 
-    int delta = now - self->tickedUpToMonotonic;
-
-    int iterationCount = delta / self->targetDeltaTimeMs;
-    if (iterationCount > 15) {
-        CLOG_C_NOTICE(&self->log,
-                      "time is so much in the future, that we can not keep up, giving up on a lot of ticks");
-        self->tickedUpToMonotonic = now;
-        iterationCount = 1;
+    const size_t maximumBehindTimeFactorUntilTickingExtra = 2;
+    const size_t maximumBehindTimeFactorUntilTickingMax = 4;
+    if (self->tickedUpToMonotonic +
+            (MonotonicTimeMs) (self->targetDeltaTimeMs * maximumBehindTimeFactorUntilTickingMax) <
+        now) {
+        iterationCount = 3;
+        CLOG_C_NOTICE(&self->log, "timeTickUpdate() should be updated more frequently, needs to do %zd ticks this update",
+                      iterationCount)
+    } else if (self->tickedUpToMonotonic +
+                   (MonotonicTimeMs) (self->targetDeltaTimeMs * maximumBehindTimeFactorUntilTickingExtra) <
+               now) {
+        iterationCount = 2;
     }
 
-    if (iterationCount > 4) {
-        CLOG_C_NOTICE(&self->log, "should be updated more frequently, needs to do %d updates", iterationCount)
-        iterationCount = 4;
-    }
-
-    if (iterationCount == 0) {
-        if ((int)(self->targetDeltaTimeMs - delta) > (int) ((float) self->targetDeltaTimeMs * 0.8f)) {
-            iterationCount = 1;
-        } else {
-            return 0;
-        }
-    }
-    if (iterationCount < 0) {
-        return 0;
-    }
-
-
-    for (int i = 0; i < iterationCount; i++) {
+    for (size_t i = 0; i < iterationCount; i++) {
         int result = self->timeTickFn(self->ptr);
         if (result < 0) {
             return result;
         }
     }
 
-    self->tickedUpToMonotonic += iterationCount * self->targetDeltaTimeMs;
+    self->tickedUpToMonotonic += self->targetDeltaTimeMs * iterationCount;
 
     return 0;
 }
