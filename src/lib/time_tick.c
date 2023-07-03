@@ -25,7 +25,7 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
     if (self->tickedUpToMonotonic >
         now + (MonotonicTimeMs) (self->targetDeltaTimeMs * maximumAheadTimeFactorUntilSkipping)) {
         // We have ticked too much into the future. We need to skip this update
-        CLOG_C_NOTICE(&self->log, "timeTickUpdate() has been called too frequently, skipping a tick this update")
+        // CLOG_C_NOTICE(&self->log, "timeTickUpdate() has been called too frequently, skipping a tick this update")
         return 0;
     }
 
