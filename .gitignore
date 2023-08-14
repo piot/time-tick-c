@@ -11,6 +11,6 @@ CMakeFiles/
 build/
 Makefile
 *.a
-*.cmake
 CMakeCache.txt
 src/test/seer_test
+cmake_install.cmake
