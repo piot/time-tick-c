@@ -2,6 +2,7 @@
  *  Copyright (c) Peter Bjorklund. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+#include <inttypes.h>
 #include <time-tick/time_tick.h>
 
 void timeTickInit(TimeTick* self, size_t targetDeltaTimeMs, void* ptr, TimeTickFn tickFn, MonotonicTimeMs now, Clog log)
@@ -21,25 +22,23 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
 
     size_t iterationCount = 1;
 
-    const size_t maximumAheadTimeFactorUntilSkipping = 3;
-    if (self->tickedUpToMonotonic >
-        now + (MonotonicTimeMs) (self->targetDeltaTimeMs * maximumAheadTimeFactorUntilSkipping)) {
+    MonotonicTimeMs tickTimeAheadDiff = self->tickedUpToMonotonic - now;
+
+    MonotonicTimeMs maximumAheadTimeFactorUntilSkipping = (3 * (MonotonicTimeMs) self->targetDeltaTimeMs);
+    if (tickTimeAheadDiff >= maximumAheadTimeFactorUntilSkipping) {
         // We have ticked too much into the future. We need to skip this update
         // CLOG_C_NOTICE(&self->log, "timeTickUpdate() has been called too frequently, skipping a tick this update")
         return 0;
     }
 
-    const size_t maximumBehindTimeFactorUntilTickingExtra = 2;
-    const size_t maximumBehindTimeFactorUntilTickingMax = 4;
-    if (self->tickedUpToMonotonic +
-            (MonotonicTimeMs) (self->targetDeltaTimeMs * maximumBehindTimeFactorUntilTickingMax) <
-        now) {
+    const MonotonicTimeMs maximumBehindTimeFactorUntilTickingExtra = (-2 * (MonotonicTimeMs) self->targetDeltaTimeMs);
+    const MonotonicTimeMs maximumBehindTimeFactorUntilTickingMax = (-4 * (MonotonicTimeMs) self->targetDeltaTimeMs);
+    if (tickTimeAheadDiff < maximumBehindTimeFactorUntilTickingMax) {
         iterationCount = 3;
-        CLOG_C_NOTICE(&self->log, "timeTickUpdate() should be updated more frequently, needs to do %zd ticks this update",
+        CLOG_C_NOTICE(&self->log,
+                      "timeTickUpdate() should be updated more frequently, needs to do %zd ticks this update",
                       iterationCount)
-    } else if (self->tickedUpToMonotonic +
-                   (MonotonicTimeMs) (self->targetDeltaTimeMs * maximumBehindTimeFactorUntilTickingExtra) <
-               now) {
+    } else if (tickTimeAheadDiff <= maximumBehindTimeFactorUntilTickingExtra) {
         iterationCount = 2;
     }
 
