@@ -7,44 +7,65 @@
 
 void timeTickInit(TimeTick* self, size_t targetDeltaTimeMs, void* ptr, TimeTickFn tickFn, MonotonicTimeMs now, Clog log)
 {
+    CLOG_ASSERT(targetDeltaTimeMs != 0U, "delta time can not be zero")
     self->tickedUpToMonotonic = now;
+    self->lastAdvancedMonotonic = now;
     self->targetDeltaTimeMs = targetDeltaTimeMs;
+    self->laggingBehindCount = 0;
     self->timeTickFn = tickFn;
+    self->state = TimeTickStateNormal;
     self->ptr = ptr;
     self->log = log;
 }
 
 int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
 {
-    if (self->targetDeltaTimeMs == 0U) {
-        self->tickedUpToMonotonic = now;
+    if (self->state == TimeTickStateFailed) {
+        return -2;
     }
 
-    size_t iterationCount = 1;
+    MonotonicTimeMs timeSinceLastAdvance = now - self->lastAdvancedMonotonic;
+    if (timeSinceLastAdvance < (5 * (MonotonicTimeMs) self->targetDeltaTimeMs / 10)) {
+       return 0;
+    }
 
     MonotonicTimeMs tickTimeAheadDiff = self->tickedUpToMonotonic - now;
 
-    MonotonicTimeMs maximumAheadTimeFactorUntilSkipping = (3 * (MonotonicTimeMs) self->targetDeltaTimeMs);
-    if (tickTimeAheadDiff >= maximumAheadTimeFactorUntilSkipping) {
-        // We have ticked too much into the future. We need to skip this update
-        // CLOG_C_NOTICE(&self->log, "timeTickUpdate() has been called too frequently, skipping a tick this update")
+    if (tickTimeAheadDiff >= 0) {
         return 0;
     }
 
-    const MonotonicTimeMs maximumBehindTimeFactorUntilTickingExtra = (-2 * (MonotonicTimeMs) self->targetDeltaTimeMs);
-    const MonotonicTimeMs maximumBehindTimeFactorUntilTickingMax = (-4 * (MonotonicTimeMs) self->targetDeltaTimeMs);
-    if (tickTimeAheadDiff < maximumBehindTimeFactorUntilTickingMax) {
-        iterationCount = 3;
-        CLOG_C_NOTICE(&self->log,
-                      "timeTickUpdate() should be updated more frequently, needs to do %zd ticks this update",
-                      iterationCount)
-    } else if (tickTimeAheadDiff <= maximumBehindTimeFactorUntilTickingExtra) {
-        iterationCount = 2;
+    size_t timeDiff = (size_t) (-tickTimeAheadDiff);
+    size_t optimalIterationCount = (timeDiff / self->targetDeltaTimeMs) + 1;
+
+    size_t iterationCount = optimalIterationCount;
+    const size_t maxIterationCountEachTick = 3;
+    if (iterationCount > maxIterationCountEachTick) {
+        iterationCount = maxIterationCountEachTick;
     }
+
+    if (iterationCount >= maxIterationCountEachTick) {
+        self->laggingBehindCount++;
+        if (self->laggingBehindCount > 30) {
+            CLOG_C_SOFT_ERROR(&self->log, "CPU can not catch up. Lagging %" PRId64 " ms. stopping execution",
+                              -tickTimeAheadDiff)
+            self->state = TimeTickStateFailed;
+            return -1;
+        }
+        if ((self->laggingBehindCount % 10) == 0) {
+            CLOG_C_NOTICE(&self->log, "CPU bound. Lagging %" PRId64 " ms. thinking about stopping the time ticker",
+                          -tickTimeAheadDiff)
+        }
+    } else {
+        self->laggingBehindCount = 0;
+    }
+
+    self->lastAdvancedMonotonic = now;
 
     for (size_t i = 0; i < iterationCount; i++) {
         int result = self->timeTickFn(self->ptr);
         if (result < 0) {
+            self->state = TimeTickStateFailed;
             return result;
         }
     }

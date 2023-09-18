@@ -11,11 +11,19 @@
 
 typedef int (*TimeTickFn)(void* self);
 
+typedef enum TimeTickState {
+    TimeTickStateNormal,
+    TimeTickStateFailed
+} TimeTickState;
+
 typedef struct TimeTick {
     MonotonicTimeMs tickedUpToMonotonic;
+    MonotonicTimeMs lastAdvancedMonotonic;
     size_t targetDeltaTimeMs;
     void* ptr;
     TimeTickFn timeTickFn;
+    size_t laggingBehindCount;
+    TimeTickState state;
     Clog log;
 } TimeTick;
 
