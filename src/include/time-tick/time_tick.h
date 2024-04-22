@@ -8,6 +8,7 @@
 #include <monotonic-time/monotonic_time.h>
 #include <stddef.h>
 #include <clog/clog.h>
+#include <stdbool.h>
 
 typedef int (*TimeTickFn)(void* self);
 
@@ -25,10 +26,12 @@ typedef struct TimeTick {
     size_t laggingBehindCount;
     TimeTickState state;
     Clog log;
+    bool useQualityChecks;
 } TimeTick;
 
 void timeTickInit(TimeTick* self, size_t targetDeltaTimeMs, void* ptr, TimeTickFn tickFn, MonotonicTimeMs now,
                   Clog log);
 int timeTickUpdate(TimeTick* self, MonotonicTimeMs now);
+void timeTickSetQualityCheckEnabled(TimeTick* self, bool on);
 
 #endif

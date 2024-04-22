@@ -16,6 +16,12 @@ void timeTickInit(TimeTick* self, size_t targetDeltaTimeMs, void* ptr, TimeTickF
     self->state = TimeTickStateNormal;
     self->ptr = ptr;
     self->log = log;
+    self->useQualityChecks = true;
+}
+
+void timeTickSetQualityCheckEnabled(TimeTick* self, bool on)
+{
+    self->useQualityChecks = on;
 }
 
 int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
@@ -44,7 +50,7 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
         iterationCount = maxIterationCountEachTick;
     }
 
-    if (iterationCount >= maxIterationCountEachTick) {
+    if (iterationCount >= maxIterationCountEachTick && self->useQualityChecks) {
         self->laggingBehindCount++;
         if (self->laggingBehindCount > 30) {
             CLOG_C_SOFT_ERROR(&self->log, "CPU can not catch up. Lagging %" PRId64 " ms. stopping execution",
@@ -52,7 +58,7 @@ int timeTickUpdate(TimeTick* self, MonotonicTimeMs now)
             self->state = TimeTickStateFailed;
             return -1;
         }
-        if ((self->laggingBehindCount % 10) == 0) {
+        if ((self->laggingBehindCount % 20) == 0) {
             CLOG_C_NOTICE(&self->log, "CPU bound. Lagging %" PRId64 " ms. thinking about stopping the time ticker",
                           -tickTimeAheadDiff)
         }
